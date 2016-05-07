@@ -234,6 +234,12 @@ module Frameit
     def keyword_padding
       (actual_font_size / 2.0).round
     end
+    
+    def word_wrap_text(text)
+      # text_character_width_points = 35
+      text_width = 50
+      text = text.wrap text_width
+    end
 
     # This will build 2 individual images with the title, which will then be added to the real image
     def build_title_images(max_width, max_height)
@@ -251,6 +257,7 @@ module Frameit
 
         current_font = font(key)
         text = fetch_text(key)
+        text = word_wrap_text(text)
         UI.message "Using #{current_font} as font the #{key} of #{screenshot.path}" if $verbose and current_font
         UI.message "Adding text '#{text}'" if $verbose
 
@@ -291,7 +298,12 @@ module Frameit
       strings_path = File.join(File.expand_path("..", screenshot.path), "#{type}.strings")
       if File.exist? strings_path
         parsed = StringsParser.parse(strings_path)
-        result = parsed.find { |k, v| screenshot.path.upcase.include? k.upcase }
+        result = parsed.find do |k, v| 
+          ext = File.extname screenshot.path
+          basename = File.basename screenshot.path, ext
+          
+          basename.upcase.end_with? k.upcase 
+        end
         return result.last if result
       end
 

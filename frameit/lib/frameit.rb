@@ -15,6 +15,9 @@ require 'frameit/options'
 
 require 'fastlane_core'
 
+require 'word_wrap'
+require 'word_wrap/core_ext'
+
 module Frameit
   class << self
     attr_accessor :config
