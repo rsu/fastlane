@@ -116,6 +116,15 @@ module Frameit
       return scale_padding(padding)
     end
 
+    # Vertical line space
+    def vertical_frame_line_space
+      line_space = fetch_config['line_space']
+      unless line_space.kind_of?(Integer)
+        line_space = line_space.split('x')[1].to_i
+      end
+      return scale_padding(line_space)
+    end
+    
     # Vertical adding around the frames
     def vertical_frame_padding
       padding = fetch_config['padding']
@@ -124,6 +133,7 @@ module Frameit
       end
       return scale_padding(padding)
     end
+    
 
     def scale_padding(padding)
       multi = 1.0
@@ -136,7 +146,7 @@ module Frameit
       background = MiniMagick::Image.open(fetch_config['background'])
 
       if background.height != screenshot.size[1]
-        background.resize "#{screenshot.size[0]}x#{screenshot.size[1]}!" # `!` says it should ignore the ratio
+        background.crop "#{screenshot.size[0]}x#{screenshot.size[1]}+0+0" # `!` says it should ignore the ratio
       end
       background
     end
@@ -167,43 +177,49 @@ module Frameit
       keyword = title_images[:keyword]
       title = title_images[:title]
 
-      # sum_width: the width of both labels together including the space inbetween
-      #   is used to calculate the ratio
-      sum_width = title.width
-      sum_width += keyword.width + keyword_padding if keyword
-
+      keyword_max_scale = 0.8
+      title_max_scale = 1.0
+      
       # Resize the 2 labels if necessary
-      smaller = 1.0 # default
-      ratio = (sum_width + keyword_padding * 2) / image.width.to_f
-      if ratio > 1.0
+      ratio = keyword.width / image.width.to_f
+      if ratio > keyword_max_scale
         # too large - resizing now
-        smaller = (1.0 / ratio)
-
-        UI.message "Text for image #{self.screenshot.path} is quite long, reducing font size by #{(ratio - 1.0).round(2)}" if $verbose
-
-        title.resize "#{(smaller * title.width).round}x"
+        smaller = (keyword_max_scale / ratio)
         keyword.resize "#{(smaller * keyword.width).round}x" if keyword
-        sum_width *= smaller
       end
+      
+      ratio = title.width / image.width.to_f
+      if ratio > title_max_scale
+        # too large - resizing now
+        smaller = (title_max_scale / ratio)
+        title.resize "#{(smaller * title.width).round}x" if title
+      end
+      
 
       vertical_padding = vertical_frame_padding
+      line_space = vertical_frame_line_space
+      
+      
       top_space = vertical_padding
-      left_space = (background.width / 2.0 - sum_width / 2.0).round
 
-      self.top_space_above_device += title.height + vertical_padding
+      self.top_space_above_device += title.height + line_space + keyword.height + vertical_padding
 
       # First, put the keyword on top of the screenshot, if we have one
       if keyword
+        left_space = (background.width / 2.0 - keyword.width / 2.0).round
+        
         background = background.composite(keyword, "png") do |c|
           c.compose "Over"
           c.geometry "+#{left_space}+#{top_space}"
         end
 
-        left_space += keyword.width + (keyword_padding * smaller)
+        top_space += keyword.height + line_space
       end
 
       # Then, put the title on top of the screenshot next to the keyword
       background = background.composite(title, "png") do |c|
+        left_space = (background.width / 2.0 - title.width / 2.0).round
+        
         c.compose "Over"
         c.geometry "+#{left_space}+#{top_space}"
       end
